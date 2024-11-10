@@ -24,6 +24,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 	var totalRecords int64
 	if q.Get("search") == "" {
 		switch userLoggedIn.RoleID {
+		// Administrator
 		case 1:
 			result := model.DB.Joins("Instance").
 				Joins("Role").
@@ -33,6 +34,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 				helper.ResponseError(w, http.StatusInternalServerError, err.Error())
 				return
 			}
+		// Non Administrator
 		case 2:
 			result := model.DB.Where("users.role_id > 1").
 				Joins("Instance").
