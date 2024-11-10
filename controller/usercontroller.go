@@ -318,3 +318,24 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 	helper.ResponseJSON(w, http.StatusOK, response)
 }
+
+func VerifyCaptcha(w http.ResponseWriter, r *http.Request) {
+	userInput := map[string]string{
+		"ip": "",
+	}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&userInput); err != nil {
+		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	defer r.Body.Close()
+	var blockade model.Blockade
+	ada := model.DB.Where("blockades.ip = ? AND blockades.count > 3", userInput["ip"]).First(&blockade)
+	if ada.RowsAffected == 0 {
+		helper.ResponseJSON(w, http.StatusOK, "Silahkan login terlebih dahulu")
+		return
+	} else {
+		helper.ResponseError(w, http.StatusAlreadyReported, "Silahkan jawab CAPTCHA")
+		return
+	}
+}
