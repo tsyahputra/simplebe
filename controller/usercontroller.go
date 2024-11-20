@@ -12,7 +12,7 @@ import (
 )
 
 func GetUsers(w http.ResponseWriter, r *http.Request) {
-	userLoggedIn, err := ParseJwtToken(r)
+	userLoggedIn, err := ParseAccessToken(r)
 	if err != "" {
 		helper.ResponseError(w, http.StatusUnauthorized, err)
 		return
@@ -119,6 +119,7 @@ func AddUser(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	// hash field password
 	hashPassword, _ := bcrypt.GenerateFromPassword([]byte(userInput["password"]), bcrypt.DefaultCost)
+	hashToken := helper.GenerateRandomString(15)
 	instanceID, _ := strconv.Atoi(userInput["instance_id"])
 	roleID, _ := strconv.Atoi(userInput["role_id"])
 	// save to db
@@ -126,8 +127,9 @@ func AddUser(w http.ResponseWriter, r *http.Request) {
 		Nama:       userInput["nama"],
 		Username:   userInput["username"],
 		Password:   string(hashPassword),
-		RoleID:     int32(roleID),
+		HashToken:  hashToken,
 		InstanceID: int32(instanceID),
+		RoleID:     int32(roleID),
 	}
 	if err := model.DB.Create(&user).Error; err != nil {
 		helper.ResponseError(w, http.StatusInternalServerError, err.Error())
@@ -177,6 +179,7 @@ func EditUser(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	// hash field password
 	hashPassword, _ := bcrypt.GenerateFromPassword([]byte(userInput["password"]), bcrypt.DefaultCost)
+	hashToken := helper.GenerateRandomString(15)
 	instanceID, _ := strconv.Atoi(userInput["instance_id"])
 	roleID, _ := strconv.Atoi(userInput["role_id"])
 	// save to db
@@ -184,8 +187,9 @@ func EditUser(w http.ResponseWriter, r *http.Request) {
 		"nama":        userInput["nama"],
 		"username":    userInput["username"],
 		"password":    string(hashPassword),
-		"role_id":     int32(roleID),
+		"hash_token":  hashToken,
 		"instance_id": int32(instanceID),
+		"role_id":     int32(roleID),
 	})
 	response := map[string]string{"message": "Sukses"}
 	helper.ResponseJSON(w, http.StatusOK, response)
@@ -229,7 +233,11 @@ func ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 	hashPassword, _ := bcrypt.GenerateFromPassword([]byte(userInput["password"]), bcrypt.DefaultCost)
-	if model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Update("password", string(hashPassword)).RowsAffected == 0 {
+	hashToken := helper.GenerateRandomString(15)
+	if model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Updates(map[string]interface{}{
+		"password":   string(hashPassword),
+		"hash_token": hashToken,
+	}).RowsAffected == 0 {
 		helper.ResponseError(w, http.StatusInternalServerError, "Gagal")
 		return
 	}
@@ -312,11 +320,14 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	if ada.RowsAffected > 0 {
 		model.DB.Where("ip = ?", userInput["ip"]).Delete(&blockade)
 	}
-	// create JWT
+	// create JWT Access Token
 	accessToken := CreateAccessToken(user)
+	// create JWT Refresh Token
+	refreshToken := CreateRefreshToken(user)
 	response := &model.UserToken{
-		User:  user,
-		Token: accessToken,
+		User:         user,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 	}
 	helper.ResponseJSON(w, http.StatusOK, response)
 }
@@ -340,4 +351,31 @@ func VerifyCaptcha(w http.ResponseWriter, r *http.Request) {
 		helper.ResponseError(w, http.StatusAlreadyReported, "Silahkan jawab CAPTCHA")
 		return
 	}
+}
+
+func RefreshJWT(w http.ResponseWriter, r *http.Request) {
+	userLoggedIn, err := ParseRefreshToken(r)
+	if err != "" {
+		helper.ResponseError(w, http.StatusUnauthorized, err)
+		return
+	}
+	var user model.User
+	userID, _ := strconv.Atoi(userLoggedIn.Subject)
+	if err := model.DB.First(&user, int32(userID)); err != nil {
+		helper.ResponseError(w, http.StatusNotFound, "Unauhorized")
+		return
+	}
+	actualCustomKey := generateCustomKey(user)
+	if userLoggedIn.CustomKey != actualCustomKey {
+		helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
+		return
+	}
+	accessToken := CreateAccessToken(user)
+	refreshToken := CreateRefreshToken(user)
+	response := &model.UserToken{
+		User:         user,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}
+	helper.ResponseJSON(w, http.StatusOK, response)
 }

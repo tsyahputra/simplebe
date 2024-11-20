@@ -19,7 +19,7 @@ func AppInitialize() {
 	router.HandleFunc("/verifycaptcha", VerifyCaptcha).Methods(http.MethodPost)
 
 	userroute := router.PathPrefix("/users").Subrouter()
-	userroute.Use(JwtMiddleware)
+	userroute.Use(JwtMiddlewareValidateAccessToken)
 	userroute.HandleFunc("", GetUsers).Methods(http.MethodGet)
 	userroute.HandleFunc("/beforeadd", BeforeAddUser).Methods(http.MethodGet)
 	userroute.HandleFunc("/add", AddUser).Methods(http.MethodPost)
@@ -29,8 +29,12 @@ func AppInitialize() {
 	userroute.HandleFunc("/changepassword/{userid}", ChangePassword).Methods(http.MethodPatch)
 	userroute.HandleFunc("", DeleteUser).Methods(http.MethodDelete)
 
+	refroute := router.PathPrefix("/refreshtoken").Subrouter()
+	refroute.Use(JwtMiddlewareValidateRefreshToken)
+	refroute.HandleFunc("", RefreshJWT).Methods(http.MethodGet)
+
 	instanceroute := router.PathPrefix("/instances").Subrouter()
-	instanceroute.Use(JwtMiddleware)
+	instanceroute.Use(JwtMiddlewareValidateAccessToken)
 	instanceroute.HandleFunc("", GetInstances).Methods(http.MethodGet)
 	instanceroute.HandleFunc("/view/{instanceid}", ViewInstance).Methods(http.MethodGet)
 	instanceroute.HandleFunc("/add", AddInstance).Methods(http.MethodPost)
@@ -38,7 +42,7 @@ func AppInitialize() {
 	instanceroute.HandleFunc("", DeleteInstance).Methods(http.MethodDelete)
 
 	roleroute := router.PathPrefix("/roles").Subrouter()
-	roleroute.Use(JwtMiddleware)
+	roleroute.Use(JwtMiddlewareValidateAccessToken)
 	roleroute.HandleFunc("", GetRoles).Methods(http.MethodGet)
 	roleroute.HandleFunc("/add", AddRole).Methods(http.MethodPost)
 	roleroute.HandleFunc("/edit/{roleid}", EditRole).Methods(http.MethodPatch)

@@ -11,6 +11,7 @@ type User struct {
 	Password   string    `json:"-" gorm:"type:varchar(100);not null"`
 	InstanceID int32     `json:"instance_id" gorm:"not null"`
 	RoleID     int32     `json:"role_id" gorm:"not null"`
+	HashToken  string    `json:"-" gorm:"type:varchar(15);null"`
 	FcmToken   string    `json:"fcm_token" gorm:"type:varchar(255);null"`
 	Modified   time.Time `json:"modified" gorm:"type:datetime;autoUpdateTime:milli"`
 	Instance   Instance  `json:"instance,omitempty" gorm:"foreignKey:InstanceID"`
@@ -18,8 +19,9 @@ type User struct {
 }
 
 type UserToken struct {
-	User  User   `json:"user"`
-	Token string `json:"token"`
+	User         User   `json:"user"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type AllUsersWithTotal struct {
