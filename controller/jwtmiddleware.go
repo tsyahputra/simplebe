@@ -210,18 +210,6 @@ func JwtMiddlewareValidateRefreshToken(next http.Handler) http.Handler {
 			helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
 			return
 		}
-		// perlu ?
-		// var user model.User
-		// userID, _ := strconv.Atoi(claims.Subject)
-		// if err := model.DB.First(&user, int32(userID)); err != nil {
-		// 	helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
-		// 	return
-		// }
-		// actualCustomKey := generateCustomKey(user)
-		// if claims.CustomKey != actualCustomKey {
-		// 	helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
-		// 	return
-		// }
 		next.ServeHTTP(w, r)
 	})
 }
