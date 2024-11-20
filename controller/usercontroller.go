@@ -362,12 +362,12 @@ func RefreshJWT(w http.ResponseWriter, r *http.Request) {
 	var user model.User
 	userID, _ := strconv.Atoi(userLoggedIn.Subject)
 	if err := model.DB.First(&user, int32(userID)); err != nil {
-		helper.ResponseError(w, http.StatusNotFound, "Unauhorized")
+		helper.ResponseError(w, http.StatusNotFound, "Sesi anda telah berakhir. Silahkan login kembali.")
 		return
 	}
 	actualCustomKey := generateCustomKey(user)
 	if userLoggedIn.CustomKey != actualCustomKey {
-		helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
+		helper.ResponseError(w, http.StatusUnauthorized, "Sesi anda telah berakhir. Silahkan login kembali.")
 		return
 	}
 	accessToken := CreateAccessToken(user)
