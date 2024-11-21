@@ -17,6 +17,8 @@ func AppInitialize() {
 	router := mux.NewRouter()
 	router.HandleFunc("/masuk", Login).Methods(http.MethodPost)
 	router.HandleFunc("/verifycaptcha", VerifyCaptcha).Methods(http.MethodPost)
+	router.HandleFunc("/resetotp", GetOTPByEmail).Methods(http.MethodPost)
+	router.HandleFunc("/resetpassword", ResetPassword).Methods(http.MethodPut)
 
 	userroute := router.PathPrefix("/users").Subrouter()
 	userroute.Use(JwtMiddlewareValidateAccessToken)

@@ -51,6 +51,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 		case 1:
 			result := model.DB.Where("users.nama LIKE ?", search).
 				Or("users.username LIKE ?", search).
+				Or("users.email LIKE ?", search).
 				Or("Role.nama LIKE ?", search).
 				Or("Instance.nama LIKE ?", search).
 				Joins("Instance").
@@ -107,6 +108,7 @@ func AddUser(w http.ResponseWriter, r *http.Request) {
 	userInput := map[string]string{
 		"nama":        "",
 		"username":    "",
+		"email":       "",
 		"password":    "",
 		"role_id":     "",
 		"instance_id": "",
@@ -126,6 +128,7 @@ func AddUser(w http.ResponseWriter, r *http.Request) {
 	user := model.User{
 		Nama:       userInput["nama"],
 		Username:   userInput["username"],
+		Email:      userInput["email"],
 		Password:   string(hashPassword),
 		HashToken:  hashToken,
 		InstanceID: int32(instanceID),
@@ -167,6 +170,7 @@ func EditUser(w http.ResponseWriter, r *http.Request) {
 	userInput := map[string]string{
 		"nama":        "",
 		"username":    "",
+		"email":       "",
 		"password":    "",
 		"role_id":     "",
 		"instance_id": "",
@@ -186,6 +190,7 @@ func EditUser(w http.ResponseWriter, r *http.Request) {
 	model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Updates(map[string]interface{}{
 		"nama":        userInput["nama"],
 		"username":    userInput["username"],
+		"email":       userInput["email"],
 		"password":    string(hashPassword),
 		"hash_token":  hashToken,
 		"instance_id": int32(instanceID),
@@ -212,6 +217,7 @@ func EditUserOnly(w http.ResponseWriter, r *http.Request) {
 	model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Updates(map[string]interface{}{
 		"nama":        user.Nama,
 		"username":    user.Username,
+		"email":       user.Email,
 		"role_id":     user.RoleID,
 		"instance_id": user.InstanceID,
 	})
@@ -377,5 +383,65 @@ func RefreshJWT(w http.ResponseWriter, r *http.Request) {
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}
+	helper.ResponseJSON(w, http.StatusOK, response)
+}
+
+func GetOTPByEmail(w http.ResponseWriter, r *http.Request) {
+	userInput := map[string]string{"email": ""}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&userInput); err != nil {
+		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	defer r.Body.Close()
+	var user model.User
+	if err := model.DB.Where("users.email = ?", userInput["email"]).First(&user).Error; err != nil {
+		helper.ResponseError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	otp := helper.GenerateOTP()
+	if err := helper.AddOTPtoRedis(otp, userInput["email"], r.Context()); err != nil {
+		helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := helper.SendOTP(otp, userInput["email"]); err != nil {
+		helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response := map[string]string{"message": "Sukses"}
+	helper.ResponseJSON(w, http.StatusOK, response)
+}
+
+func ResetPassword(w http.ResponseWriter, r *http.Request) {
+	userInput := map[string]string{
+		"otp":      "",
+		"email":    "",
+		"password": "",
+	}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&userInput); err != nil {
+		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	defer r.Body.Close()
+	err, isInternalErr := helper.VerifyOTP(userInput["otp"], userInput["email"], r.Context())
+	if err != nil {
+		if isInternalErr {
+			helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+		} else {
+			helper.ResponseError(w, http.StatusUnauthorized, err.Error())
+		}
+		return
+	}
+	hashPassword, _ := bcrypt.GenerateFromPassword([]byte(userInput["password"]), bcrypt.DefaultCost)
+	hashToken := helper.GenerateRandomString(15)
+	if err := model.DB.Model(&model.User{}).Where("email = ?", userInput["email"]).Updates(map[string]interface{}{
+		"password":   string(hashPassword),
+		"hash_token": hashToken,
+	}).Error; err != nil {
+		helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response := map[string]string{"message": "Sukses"}
 	helper.ResponseJSON(w, http.StatusOK, response)
 }
