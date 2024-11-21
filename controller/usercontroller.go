@@ -50,7 +50,6 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 		switch userLoggedIn.RoleID {
 		case 1:
 			result := model.DB.Where("users.nama LIKE ?", search).
-				Or("users.username LIKE ?", search).
 				Or("users.email LIKE ?", search).
 				Or("Role.nama LIKE ?", search).
 				Or("Instance.nama LIKE ?", search).
@@ -66,7 +65,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 			result := model.DB.Where(
 				model.DB.Where("users.role_id > 1").
 					Where(model.DB.Where("users.nama LIKE ?", search).
-						Or("users.username LIKE ?", search).
+						Or("users.email LIKE ?", search).
 						Or("Role.nama LIKE ?", search).
 						Or("Instance.nama LIKE ?", search))).
 				Joins("Instance").
@@ -107,7 +106,6 @@ func BeforeAddUser(w http.ResponseWriter, r *http.Request) {
 func AddUser(w http.ResponseWriter, r *http.Request) {
 	userInput := map[string]string{
 		"nama":        "",
-		"username":    "",
 		"email":       "",
 		"password":    "",
 		"role_id":     "",
@@ -127,7 +125,6 @@ func AddUser(w http.ResponseWriter, r *http.Request) {
 	// save to db
 	user := model.User{
 		Nama:       userInput["nama"],
-		Username:   userInput["username"],
 		Email:      userInput["email"],
 		Password:   string(hashPassword),
 		HashToken:  hashToken,
@@ -169,7 +166,6 @@ func EditUser(w http.ResponseWriter, r *http.Request) {
 	}
 	userInput := map[string]string{
 		"nama":        "",
-		"username":    "",
 		"email":       "",
 		"password":    "",
 		"role_id":     "",
@@ -189,7 +185,6 @@ func EditUser(w http.ResponseWriter, r *http.Request) {
 	// save to db
 	model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Updates(map[string]interface{}{
 		"nama":        userInput["nama"],
-		"username":    userInput["username"],
 		"email":       userInput["email"],
 		"password":    string(hashPassword),
 		"hash_token":  hashToken,
@@ -216,7 +211,6 @@ func EditUserOnly(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Updates(map[string]interface{}{
 		"nama":        user.Nama,
-		"username":    user.Username,
 		"email":       user.Email,
 		"role_id":     user.RoleID,
 		"instance_id": user.InstanceID,
@@ -270,7 +264,7 @@ func DeleteUser(w http.ResponseWriter, r *http.Request) {
 
 func Login(w http.ResponseWriter, r *http.Request) {
 	userInput := map[string]string{
-		"username":  "",
+		"email":     "",
 		"password":  "",
 		"fcm_token": "",
 		"ip":        "",
@@ -284,9 +278,9 @@ func Login(w http.ResponseWriter, r *http.Request) {
 
 	var blockade model.Blockade
 	ada := model.DB.Where("blockades.ip = ?", userInput["ip"]).First(&blockade)
-	// get username exist
+	// get email exist
 	var user model.User
-	if err := model.DB.Where("users.username = ?", userInput["username"]).
+	if err := model.DB.Where("users.email = ?", userInput["email"]).
 		Joins("Instance").
 		Joins("Role").
 		First(&user).Error; err != nil {
@@ -299,7 +293,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			}
 			model.DB.Model(&model.Blockade{}).Where("blockades.ip = ?", userInput["ip"]).Update("count", blockade.Count+1)
 		}
-		helper.ResponseError(w, http.StatusUnauthorized, "Username atau password salah")
+		helper.ResponseError(w, http.StatusUnauthorized, "email atau password salah")
 		return
 	}
 	// verify user pass
@@ -313,14 +307,14 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			}
 			model.DB.Model(&model.Blockade{}).Where("blockades.ip = ?", userInput["ip"]).Update("count", blockade.Count+1)
 		}
-		response := map[string]string{"message": "Username atau password salah"}
+		response := map[string]string{"message": "email atau password salah"}
 		helper.ResponseJSON(w, http.StatusUnauthorized, response)
 		return
 	}
 
 	if userInput["fcm_token"] != "" {
 		model.DB.Model(&model.User{}).
-			Where("username = ?", userInput["username"]).
+			Where("email = ?", userInput["email"]).
 			Update("fcm_token", userInput["fcm_token"])
 	}
 	if ada.RowsAffected > 0 {
