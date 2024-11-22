@@ -30,6 +30,9 @@ func JwtMiddlewareValidateAccessToken(next http.Handler) http.Handler {
 			case jwt.ValidationErrorSignatureInvalid:
 				helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
 				return
+			case jwt.ValidationErrorExpired:
+				helper.ResponseError(w, http.StatusUnauthorized, "Token expire.")
+				return
 			default:
 				helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
 				return
@@ -104,6 +107,9 @@ func ParseAccessToken(r *http.Request) (*model.AccessTokenCustomClaims, string) 
 		switch v.Errors {
 		case jwt.ValidationErrorSignatureInvalid:
 			message := "Unauthenticated. Signature invalid"
+			return &model.AccessTokenCustomClaims{}, message
+		case jwt.ValidationErrorExpired:
+			message := "Token expire."
 			return &model.AccessTokenCustomClaims{}, message
 		default:
 			message := "Unauthenticated"
