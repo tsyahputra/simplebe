@@ -7,7 +7,7 @@ import (
 
 func main() {
 	model.ConnectDatabase()
-	controller.FirebaseInit()
+	// controller.FirebaseInit()
 	// helper.RedisConnect()
 	// helper.SMTPConnect()
 	controller.AppInitialize()
