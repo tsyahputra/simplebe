@@ -464,12 +464,12 @@ func VerifyAndEnable2FAHandler(w http.ResponseWriter, r *http.Request) {
 
 // Disable 2FA
 func Disable2FAHandler(w http.ResponseWriter, r *http.Request) {
-	userLoggedIn, err := ParseAccessToken(r)
-	if err != "" {
-		helper.ResponseError(w, http.StatusUnauthorized, err)
+	vars := mux.Vars(r)
+	userID, err := strconv.Atoi(vars["userid"])
+	if err != nil {
+		helper.ResponseError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	userID, _ := strconv.Atoi(userLoggedIn.Subject)
 	model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Updates(map[string]any{
 		"two_fa_secret":  "",
 		"two_fa_enabled": false,
