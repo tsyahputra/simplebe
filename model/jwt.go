@@ -1,6 +1,6 @@
 package model
 
-import "github.com/golang-jwt/jwt/v4"
+import "github.com/golang-jwt/jwt/v5"
 
 type AccessTokenCustomClaims struct {
 	jwt.RegisteredClaims

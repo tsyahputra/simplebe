@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/tsyahputra/simplebe/helper"
 	"github.com/tsyahputra/simplebe/model"
 )
@@ -25,18 +25,8 @@ func JwtMiddlewareValidateAccessToken(next http.Handler) http.Handler {
 		}
 		token, err := VerifyAccessToken(tokenString)
 		if err != nil {
-			v, _ := err.(*jwt.ValidationError)
-			switch v.Errors {
-			case jwt.ValidationErrorSignatureInvalid:
-				helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
-				return
-			case jwt.ValidationErrorExpired:
-				helper.ResponseError(w, http.StatusUnauthorized, "Token expire.")
-				return
-			default:
-				helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
-				return
-			}
+			helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
+			return
 		}
 		_, ok := token.Claims.(*model.AccessTokenCustomClaims)
 		if !ok || !token.Valid {
@@ -103,21 +93,11 @@ func ParseAccessToken(r *http.Request) (*model.AccessTokenCustomClaims, string) 
 	token, err := VerifyAccessToken(tokenString)
 	claims, ok := token.Claims.(*model.AccessTokenCustomClaims)
 	if err != nil {
-		v, _ := err.(*jwt.ValidationError)
-		switch v.Errors {
-		case jwt.ValidationErrorSignatureInvalid:
-			message := "Unauthenticated. Signature invalid"
-			return &model.AccessTokenCustomClaims{}, message
-		case jwt.ValidationErrorExpired:
-			message := "Token expire."
-			return &model.AccessTokenCustomClaims{}, message
-		default:
-			message := "Unauthenticated"
-			return &model.AccessTokenCustomClaims{}, message
-		}
-	}
-	if !ok || !token.Valid || !claims.VerifyAudience("SSO", true) || claims.KeyType != "access" {
 		message := "Unauthenticated"
+		return &model.AccessTokenCustomClaims{}, message
+	}
+	if !ok || !token.Valid || claims.KeyType != "access" {
+		message := "Unauthenticated. Not access token."
 		return &model.AccessTokenCustomClaims{}, message
 	}
 	return claims, ""
@@ -175,18 +155,11 @@ func ParseRefreshToken(r *http.Request) (*model.RefreshTokenCustomClaims, string
 	token, err := VerifyRefreshToken(tokenString)
 	claims, ok := token.Claims.(*model.RefreshTokenCustomClaims)
 	if err != nil {
-		v, _ := err.(*jwt.ValidationError)
-		switch v.Errors {
-		case jwt.ValidationErrorSignatureInvalid:
-			message := "Unauthenticated. Signature invalid"
-			return &model.RefreshTokenCustomClaims{}, message
-		default:
-			message := "Unauthenticated"
-			return &model.RefreshTokenCustomClaims{}, message
-		}
-	}
-	if !ok || !token.Valid || !claims.VerifyAudience("SSO", true) || claims.KeyType != "refresh" {
 		message := "Unauthenticated"
+		return &model.RefreshTokenCustomClaims{}, message
+	}
+	if !ok || !token.Valid || claims.KeyType != "refresh" {
+		message := "Unauthenticated. Not refresh token."
 		return &model.RefreshTokenCustomClaims{}, message
 	}
 	return claims, ""
@@ -201,19 +174,12 @@ func JwtMiddlewareValidateRefreshToken(next http.Handler) http.Handler {
 		}
 		token, err := VerifyRefreshToken(tokenString)
 		if err != nil {
-			v, _ := err.(*jwt.ValidationError)
-			switch v.Errors {
-			case jwt.ValidationErrorSignatureInvalid:
-				helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
-				return
-			default:
-				helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
-				return
-			}
-		}
-		_, ok := token.Claims.(*model.RefreshTokenCustomClaims)
-		if !ok || !token.Valid {
 			helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
+			return
+		}
+		claims, ok := token.Claims.(*model.RefreshTokenCustomClaims)
+		if !ok || !token.Valid || claims.KeyType != "refresh" {
+			helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized. Not refresh token.")
 			return
 		}
 		next.ServeHTTP(w, r)
