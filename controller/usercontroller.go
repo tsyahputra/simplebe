@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/pquerna/otp/totp"
 	"github.com/tsyahputra/simplebe/helper"
 	"github.com/tsyahputra/simplebe/model"
 	"golang.org/x/crypto/bcrypt"
@@ -119,7 +121,7 @@ func AddUser(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	// hash field password
 	hashPassword, _ := bcrypt.GenerateFromPassword([]byte(userInput["password"]), bcrypt.DefaultCost)
-	hashToken := helper.GenerateRandomString(15)
+	customKey, _ := helper.GenerateRandomString(16)
 	instanceID, _ := strconv.Atoi(userInput["instance_id"])
 	roleID, _ := strconv.Atoi(userInput["role_id"])
 	// save to db
@@ -127,9 +129,9 @@ func AddUser(w http.ResponseWriter, r *http.Request) {
 		Nama:       userInput["nama"],
 		Email:      userInput["email"],
 		Password:   string(hashPassword),
-		HashToken:  hashToken,
 		InstanceID: int32(instanceID),
 		RoleID:     int32(roleID),
+		CustomKey:  customKey,
 	}
 	if err := model.DB.Create(&user).Error; err != nil {
 		helper.ResponseError(w, http.StatusInternalServerError, err.Error())
@@ -179,17 +181,19 @@ func EditUser(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	// hash field password
 	hashPassword, _ := bcrypt.GenerateFromPassword([]byte(userInput["password"]), bcrypt.DefaultCost)
-	hashToken := helper.GenerateRandomString(15)
+	customKey, _ := helper.GenerateRandomString(16)
 	instanceID, _ := strconv.Atoi(userInput["instance_id"])
 	roleID, _ := strconv.Atoi(userInput["role_id"])
 	// save to db
 	model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Updates(map[string]interface{}{
-		"nama":        userInput["nama"],
-		"email":       userInput["email"],
-		"password":    string(hashPassword),
-		"hash_token":  hashToken,
-		"instance_id": int32(instanceID),
-		"role_id":     int32(roleID),
+		"nama":                  userInput["nama"],
+		"email":                 userInput["email"],
+		"password":              string(hashPassword),
+		"instance_id":           int32(instanceID),
+		"role_id":               int32(roleID),
+		"custom_key":            customKey,
+		"reset_password_token":  "",
+		"reset_password_Expiry": 0,
 	})
 	response := map[string]string{"message": "Sukses"}
 	helper.ResponseJSON(w, http.StatusOK, response)
@@ -233,10 +237,12 @@ func ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 	hashPassword, _ := bcrypt.GenerateFromPassword([]byte(userInput["password"]), bcrypt.DefaultCost)
-	hashToken := helper.GenerateRandomString(15)
+	customKey, _ := helper.GenerateRandomString(16)
 	if model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Updates(map[string]interface{}{
-		"password":   string(hashPassword),
-		"hash_token": hashToken,
+		"password":              string(hashPassword),
+		"custom_key":            customKey,
+		"reset_password_token":  "",
+		"reset_password_Expiry": 0,
 	}).RowsAffected == 0 {
 		helper.ResponseError(w, http.StatusInternalServerError, "Gagal")
 		return
@@ -365,8 +371,7 @@ func RefreshJWT(w http.ResponseWriter, r *http.Request) {
 		helper.ResponseError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	actualCustomKey := generateCustomKey(user)
-	if userLoggedIn.CustomKey != actualCustomKey {
+	if userLoggedIn.CustomKey != user.CustomKey {
 		helper.ResponseError(w, http.StatusUnauthorized, "Token anda tidak sesuai.")
 		return
 	}
@@ -380,37 +385,141 @@ func RefreshJWT(w http.ResponseWriter, r *http.Request) {
 	helper.ResponseJSON(w, http.StatusOK, response)
 }
 
-func GetOTPByEmail(w http.ResponseWriter, r *http.Request) {
-	userInput := map[string]string{"email": ""}
+// Generate2FASecretHandler menghasilkan kunci rahasia 2FA baru dan URL QR Code untuk pengguna.
+// Secret ini akan disimpan sementara di database sampai diverifikasi.
+func Generate2FASecretHandler(w http.ResponseWriter, r *http.Request) {
+	userLoggedIn, err := ParseAccessToken(r)
+	if err != "" {
+		helper.ResponseError(w, http.StatusUnauthorized, err)
+		return
+	}
+	userID, _ := strconv.Atoi(userLoggedIn.Subject)
+	var user model.User
+	if err := model.DB.Where("users.id = ?", int32(userID)).
+		Joins("Instance").
+		First(&user).Error; err != nil {
+		helper.ResponseError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if user.TwoFAEnabled {
+		helper.ResponseError(w, http.StatusBadRequest, "2FA sudah diaktifkan untuk akun ini")
+		return
+	}
+
+	// Hasilkan kunci rahasia 2FA dan URL QR Code
+	key, notOk := totp.Generate(totp.GenerateOpts{
+		Issuer:      "SSO",
+		AccountName: user.Email,
+	})
+	if notOk != nil {
+		helper.ResponseError(w, http.StatusInternalServerError, "Gagal menghasilkan URL QR Code")
+		return
+	}
+	secret := key.Secret()
+	qrCodeURL := key.URL()
+	// Simpan secret ke database. Ini penting agar bisa divalidasi nanti.
+	// Jika pengguna tidak menyelesaikan proses, secret ini akan tetap ada sampai mereka mencoba lagi atau direset.
+	model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Update("two_fa_secret", secret)
+	response := map[string]string{"qr_code_url": qrCodeURL, "secret": secret}
+	helper.ResponseJSON(w, http.StatusOK, response)
+}
+
+// VerifyAndEnable2FAHandler memverifikasi kode 2FA yang dimasukkan pengguna
+// dan mengaktifkan 2FA jika kode valid.
+func VerifyAndEnable2FAHandler(w http.ResponseWriter, r *http.Request) {
+	userLoggedIn, eror := ParseAccessToken(r)
+	if eror != "" {
+		helper.ResponseError(w, http.StatusUnauthorized, eror)
+		return
+	}
+	userID, _ := strconv.Atoi(userLoggedIn.Subject)
+	userInput := map[string]string{"code": ""}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&userInput); err != nil {
 		helper.ResponseError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer r.Body.Close()
+
+	var user model.User
+	if err := model.DB.Where("users.ID = ?", int32(userID)).First(&user).Error; err != nil {
+		helper.ResponseError(w, http.StatusNotFound, "Pengguna tidak ditemukan")
+		return
+	}
+	if user.TwoFASecret == "" {
+		helper.ResponseError(w, http.StatusBadRequest, "2FA belum diaktifkan.")
+		return
+	}
+	valid := totp.Validate(userInput["code"], user.TwoFASecret)
+	if !valid {
+		helper.ResponseError(w, http.StatusUnauthorized, "Kode 2FA tidak valid.")
+		return
+	}
+	model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Updates(map[string]any{
+		"two_fa_enabled": true,
+	})
+	response := map[string]string{"message": "Sukses"}
+	helper.ResponseJSON(w, http.StatusOK, response)
+}
+
+// Disable 2FA
+func Disable2FAHandler(w http.ResponseWriter, r *http.Request) {
+	userLoggedIn, err := ParseAccessToken(r)
+	if err != "" {
+		helper.ResponseError(w, http.StatusUnauthorized, err)
+		return
+	}
+	userID, _ := strconv.Atoi(userLoggedIn.Subject)
+	model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Updates(map[string]any{
+		"two_fa_secret":  "",
+		"two_fa_enabled": false,
+	})
+	response := map[string]string{"message": "Sukses"}
+	helper.ResponseJSON(w, http.StatusOK, response)
+}
+
+// Verifikasi kode 2FA untuk reset password
+func Verify2FAResetPassword(w http.ResponseWriter, r *http.Request) {
+	userInput := map[string]string{"email": "", "code": ""}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&userInput); err != nil {
+		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	defer r.Body.Close()
+
 	var user model.User
 	if err := model.DB.Where("users.email = ?", userInput["email"]).First(&user).Error; err != nil {
 		helper.ResponseError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	otp := helper.GenerateOTP()
-	if err := helper.AddOTPtoRedis(otp, userInput["email"], r.Context()); err != nil {
-		helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+	if !user.TwoFAEnabled || user.TwoFASecret == "" {
+		helper.ResponseError(w, http.StatusBadRequest, "2FA belum diaktifkan.")
 		return
 	}
-	if err := helper.SendOTP(otp, userInput["email"]); err != nil {
-		helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+	valid := totp.Validate(userInput["code"], user.TwoFASecret)
+	if !valid {
+		helper.ResponseError(w, http.StatusUnauthorized, "Kode 2FA tidak valid.")
 		return
 	}
-	response := map[string]string{"message": "Sukses"}
+	// Jika 2FA valid, generate token khusus untuk reset password
+	resetToken, _ := helper.GenerateRandomString(32)
+	model.DB.Model(&model.User{}).Where("email = ?", userInput["email"]).
+		Updates(map[string]any{
+			"reset_password_token":  resetToken,
+			"reset_password_expiry": time.Now().Add(time.Minute * 30).Unix(),
+		})
+	response := map[string]string{
+		"reset_token": resetToken,
+	}
 	helper.ResponseJSON(w, http.StatusOK, response)
 }
 
 func ResetPassword(w http.ResponseWriter, r *http.Request) {
 	userInput := map[string]string{
-		"otp":      "",
-		"email":    "",
-		"password": "",
+		"email":       "",
+		"password":    "",
+		"reset_token": "",
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&userInput); err != nil {
@@ -418,24 +527,26 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.Body.Close()
-	err, isInternalErr := helper.VerifyOTP(userInput["otp"], userInput["email"], r.Context())
-	if err != nil {
-		if isInternalErr {
-			helper.ResponseError(w, http.StatusInternalServerError, err.Error())
-		} else {
-			helper.ResponseError(w, http.StatusUnauthorized, err.Error())
-		}
+
+	var user model.User
+	if err := model.DB.Where("users.email = ? AND reset_password_token = ?", userInput["email"], userInput["reset_token"]).
+		First(&user).Error; err != nil {
+		helper.ResponseError(w, http.StatusNotFound, "Invalid or expired reset token")
+		return
+	}
+	if time.Now().Unix() > user.ResetPasswordExpiry {
+		helper.ResponseError(w, http.StatusUnauthorized, "Reset token expired")
 		return
 	}
 	hashPassword, _ := bcrypt.GenerateFromPassword([]byte(userInput["password"]), bcrypt.DefaultCost)
-	hashToken := helper.GenerateRandomString(15)
-	if err := model.DB.Model(&model.User{}).Where("email = ?", userInput["email"]).Updates(map[string]interface{}{
-		"password":   string(hashPassword),
-		"hash_token": hashToken,
-	}).Error; err != nil {
-		helper.ResponseError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
+	customKey, _ := helper.GenerateRandomString(16)
+	model.DB.Model(&model.User{}).Where("email = ?", userInput["email"]).
+		Updates(map[string]any{
+			"password":              string(hashPassword),
+			"custom_key":            customKey,
+			"reset_password_token":  "",
+			"reset_password_expiry": 0,
+		})
 	response := map[string]string{"message": "Sukses"}
 	helper.ResponseJSON(w, http.StatusOK, response)
 }

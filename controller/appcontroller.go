@@ -17,8 +17,8 @@ func AppInitialize() {
 	router := mux.NewRouter()
 	router.HandleFunc("/masuk", Login).Methods(http.MethodPost)
 	router.HandleFunc("/verifycaptcha", VerifyCaptcha).Methods(http.MethodPost)
-	router.HandleFunc("/resetotp", GetOTPByEmail).Methods(http.MethodPost)
-	router.HandleFunc("/resetpassword", ResetPassword).Methods(http.MethodPut)
+	router.HandleFunc("/verify-2fa-reset", Verify2FAResetPassword).Methods(http.MethodPost)
+	router.HandleFunc("/reset-password", ResetPassword).Methods(http.MethodPost)
 
 	userroute := router.PathPrefix("/users").Subrouter()
 	userroute.Use(JwtMiddlewareValidateAccessToken)
@@ -30,6 +30,9 @@ func AppInitialize() {
 	userroute.HandleFunc("/editonly/{userid}", EditUserOnly).Methods(http.MethodPatch)
 	userroute.HandleFunc("/changepassword/{userid}", ChangePassword).Methods(http.MethodPatch)
 	userroute.HandleFunc("", DeleteUser).Methods(http.MethodDelete)
+	userroute.HandleFunc("/generate-secret", Generate2FASecretHandler).Methods(http.MethodPost)
+	userroute.HandleFunc("/verify-enable", VerifyAndEnable2FAHandler).Methods(http.MethodPost)
+	userroute.HandleFunc("/disable-2fa", Disable2FAHandler).Methods(http.MethodGet)
 
 	refroute := router.PathPrefix("/refreshtoken").Subrouter()
 	refroute.Use(JwtMiddlewareValidateRefreshToken)

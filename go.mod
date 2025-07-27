@@ -15,6 +15,8 @@ require (
 	gorm.io/gorm v1.30.1
 )
 
+require github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
+
 require (
 	cel.dev/expr v0.24.0 // indirect
 	cloud.google.com/go v0.121.4 // indirect
@@ -53,6 +55,7 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/lyft/protoc-gen-star/v2 v2.0.4-0.20230330145011-496ad1ac90a4 // indirect
 	github.com/planetscale/vtprotobuf v0.6.1-0.20240319094008-0393e58bdf10 // indirect
+	github.com/pquerna/otp v1.5.0
 	github.com/spf13/afero v1.10.0 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
 	github.com/zeebo/errs v1.4.0 // indirect

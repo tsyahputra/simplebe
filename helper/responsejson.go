@@ -1,13 +1,12 @@
 package helper
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
-	"math/rand"
+	"fmt"
 	"net/http"
-	"strings"
 )
-
-const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 func ResponseJSON(w http.ResponseWriter, code int, payload interface{}) {
 	respon, _ := json.Marshal(payload)
@@ -20,12 +19,11 @@ func ResponseError(w http.ResponseWriter, code int, message string) {
 	ResponseJSON(w, code, map[string]string{"message": message})
 }
 
-func GenerateRandomString(n int) string {
-	sb := strings.Builder{}
-	sb.Grow(n)
-	for i := 0; i < n; i++ {
-		idx := rand.Int63() % int64(len(letterBytes))
-		sb.WriteByte(letterBytes[idx])
+func GenerateRandomString(length int) (string, error) {
+	b := make([]byte, length/2)
+	_, err := rand.Read(b)
+	if err != nil {
+		return "", fmt.Errorf("gagal menghasilkan byte acak: %w", err)
 	}
-	return sb.String()
+	return hex.EncodeToString(b), nil
 }
