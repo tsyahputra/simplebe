@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func ResponseJSON(w http.ResponseWriter, code int, payload interface{}) {
+func ResponseJSON(w http.ResponseWriter, code int, payload any) {
 	respon, _ := json.Marshal(payload)
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(code)
