@@ -111,6 +111,7 @@ func GenerateCustomKey(user model.User) string {
 }
 
 func CreateRefreshToken(user model.User) string {
+	cusKey := GenerateCustomKey(user)
 	claims := &model.RefreshTokenCustomClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:   user.Nama,
@@ -118,7 +119,7 @@ func CreateRefreshToken(user model.User) string {
 			Audience: []string{"SSO"},
 			IssuedAt: jwt.NewNumericDate(time.Now()),
 		},
-		CustomKey: user.CustomKey,
+		CustomKey: cusKey,
 		KeyType:   "refresh",
 	}
 	signBytes, _ := os.ReadFile("config/simple-refresh-private.key")
