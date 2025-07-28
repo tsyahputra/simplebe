@@ -103,7 +103,7 @@ func ParseAccessToken(r *http.Request) (*model.AccessTokenCustomClaims, string) 
 	return claims, ""
 }
 
-func GenerateCustomKey(user model.User) string {
+func generateCustomKey(user model.User) string {
 	h := hmac.New(sha256.New, []byte(user.CustomKey))
 	h.Write([]byte(strconv.Itoa(int(user.ID))))
 	sha := hex.EncodeToString(h.Sum(nil))
@@ -111,7 +111,7 @@ func GenerateCustomKey(user model.User) string {
 }
 
 func CreateRefreshToken(user model.User) string {
-	cusKey := GenerateCustomKey(user)
+	cusKey := generateCustomKey(user)
 	claims := &model.RefreshTokenCustomClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:   user.Nama,

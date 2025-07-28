@@ -371,7 +371,7 @@ func RefreshJWT(w http.ResponseWriter, r *http.Request) {
 		helper.ResponseError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	actualCustomKey := GenerateCustomKey(user)
+	actualCustomKey := generateCustomKey(user)
 	if userLoggedIn.CustomKey != actualCustomKey {
 		helper.ResponseError(w, http.StatusUnauthorized, "Token anda tidak sesuai.")
 		return
