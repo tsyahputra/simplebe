@@ -20,17 +20,17 @@ func JwtMiddlewareValidateAccessToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenString, err := ExtractToken(r)
 		if err != nil {
-			helper.ResponseError(w, http.StatusUnauthorized, "Unauthenticated. Invalid token")
+			helper.ResponseMessage(w, http.StatusUnauthorized, "Unauthenticated. Invalid token")
 			return
 		}
 		token, err := VerifyAccessToken(tokenString)
 		if err != nil {
-			helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
+			helper.ResponseMessage(w, http.StatusUnauthorized, "Unauhorized")
 			return
 		}
 		_, ok := token.Claims.(*model.AccessTokenCustomClaims)
 		if !ok || !token.Valid {
-			helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
+			helper.ResponseMessage(w, http.StatusUnauthorized, "Unauhorized")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -169,17 +169,17 @@ func JwtMiddlewareValidateRefreshToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenString, err := ExtractToken(r)
 		if err != nil {
-			helper.ResponseError(w, http.StatusUnauthorized, "Unauthenticated. Invalid token")
+			helper.ResponseMessage(w, http.StatusUnauthorized, "Unauthenticated. Invalid token")
 			return
 		}
 		token, err := VerifyRefreshToken(tokenString)
 		if err != nil {
-			helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized")
+			helper.ResponseMessage(w, http.StatusUnauthorized, "Unauhorized")
 			return
 		}
 		claims, ok := token.Claims.(*model.RefreshTokenCustomClaims)
 		if !ok || !token.Valid || claims.KeyType != "refresh" {
-			helper.ResponseError(w, http.StatusUnauthorized, "Unauhorized. Not refresh token.")
+			helper.ResponseMessage(w, http.StatusUnauthorized, "Unauhorized. Not refresh token.")
 			return
 		}
 		next.ServeHTTP(w, r)

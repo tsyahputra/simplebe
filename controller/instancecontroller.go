@@ -22,7 +22,7 @@ func GetInstances(w http.ResponseWriter, r *http.Request) {
 		totalRecords = result.RowsAffected
 		if err := result.Limit(10).Offset(offset).
 			Find(&instances).Error; err != nil {
-			helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+			helper.ResponseMessage(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 	} else {
@@ -33,7 +33,7 @@ func GetInstances(w http.ResponseWriter, r *http.Request) {
 			Find(&instances)
 		totalRecords = result.RowsAffected
 		if err := result.Limit(10).Offset(offset).Find(&instances).Error; err != nil {
-			helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+			helper.ResponseMessage(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 	}
@@ -48,13 +48,13 @@ func ViewInstance(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	instanceID, err := strconv.Atoi(vars["instanceid"])
 	if err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	var instance model.Instance
 	if err := model.DB.Where("instances.id = ?", int32(instanceID)).
 		First(&instance).Error; err != nil {
-		helper.ResponseError(w, http.StatusNotFound, err.Error())
+		helper.ResponseMessage(w, http.StatusNotFound, err.Error())
 		return
 	}
 	helper.ResponseJSON(w, http.StatusOK, instance)
@@ -64,29 +64,28 @@ func AddInstance(w http.ResponseWriter, r *http.Request) {
 	var instance model.Instance
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&instance); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, "Gagal")
+		helper.ResponseMessage(w, http.StatusBadRequest, "Gagal")
 		return
 	}
 	defer r.Body.Close()
 	if err := model.DB.Create(&instance).Error; err != nil {
-		helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+		helper.ResponseMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	response := map[string]string{"message": "Sukses"}
-	helper.ResponseJSON(w, http.StatusOK, response)
+	helper.ResponseMessage(w, http.StatusOK, "Sukses")
 }
 
 func EditInstance(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	instanceID, err := strconv.Atoi(vars["instanceid"])
 	if err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	var instance model.Instance
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&instance); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, "Gagal")
+		helper.ResponseMessage(w, http.StatusBadRequest, "Gagal")
 		return
 	}
 	defer r.Body.Close()
@@ -97,23 +96,21 @@ func EditInstance(w http.ResponseWriter, r *http.Request) {
 		"telp":      instance.Telp,
 		"email":     instance.Email,
 	})
-	response := map[string]string{"message": "Sukses"}
-	helper.ResponseJSON(w, http.StatusOK, response)
+	helper.ResponseMessage(w, http.StatusOK, "Sukses")
 }
 
 func DeleteInstance(w http.ResponseWriter, r *http.Request) {
 	input := map[string]int32{"id": 0}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&input); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer r.Body.Close()
 	var instance model.Instance
 	if model.DB.Model(model.Instance{}).Where("id = ?", input["id"]).Delete(&instance).RowsAffected == 0 {
-		helper.ResponseError(w, http.StatusInternalServerError, "Gagal hapus data")
+		helper.ResponseMessage(w, http.StatusInternalServerError, "Gagal hapus data")
 		return
 	}
-	response := map[string]string{"message": "Sukses"}
-	helper.ResponseJSON(w, http.StatusOK, response)
+	helper.ResponseMessage(w, http.StatusOK, "Sukses")
 }

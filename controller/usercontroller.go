@@ -16,7 +16,7 @@ import (
 func GetUsers(w http.ResponseWriter, r *http.Request) {
 	userLoggedIn, err := ParseAccessToken(r)
 	if err != "" {
-		helper.ResponseError(w, http.StatusUnauthorized, err)
+		helper.ResponseMessage(w, http.StatusUnauthorized, err)
 		return
 	}
 	q := r.URL.Query()
@@ -33,7 +33,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 				Find(&users)
 			totalRecords = result.RowsAffected
 			if err := result.Limit(10).Offset(offset).Find(&users).Error; err != nil {
-				helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+				helper.ResponseMessage(w, http.StatusInternalServerError, err.Error())
 				return
 			}
 		// Non Administrator
@@ -44,7 +44,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 				Find(&users)
 			totalRecords = result.RowsAffected
 			if err := result.Limit(10).Offset(offset).Find(&users).Error; err != nil {
-				helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+				helper.ResponseMessage(w, http.StatusInternalServerError, err.Error())
 				return
 			}
 		}
@@ -60,7 +60,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 				Find(&users)
 			totalRecords = result.RowsAffected
 			if err := result.Limit(10).Offset(offset).Find(&users).Error; err != nil {
-				helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+				helper.ResponseMessage(w, http.StatusInternalServerError, err.Error())
 				return
 			}
 		case 2:
@@ -75,7 +75,7 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 				Find(&users)
 			totalRecords = result.RowsAffected
 			if err := result.Limit(10).Offset(offset).Find(&users).Error; err != nil {
-				helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+				helper.ResponseMessage(w, http.StatusInternalServerError, err.Error())
 				return
 			}
 		}
@@ -91,11 +91,11 @@ func BeforeAddUser(w http.ResponseWriter, r *http.Request) {
 	var instances []model.Instance
 	var roles []model.Role
 	if err := model.DB.Find(&instances).Error; err != nil {
-		helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+		helper.ResponseMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if err := model.DB.Find(&roles).Error; err != nil {
-		helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+		helper.ResponseMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	response := &model.InstancesRoles{
@@ -115,7 +115,7 @@ func AddUser(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&userInput); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer r.Body.Close()
@@ -134,18 +134,17 @@ func AddUser(w http.ResponseWriter, r *http.Request) {
 		CustomKey:  customKey,
 	}
 	if err := model.DB.Create(&user).Error; err != nil {
-		helper.ResponseError(w, http.StatusInternalServerError, err.Error())
+		helper.ResponseMessage(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	response := map[string]string{"message": "Sukses"}
-	helper.ResponseJSON(w, http.StatusOK, response)
+	helper.ResponseMessage(w, http.StatusOK, "Sukses")
 }
 
 func ViewUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userID, err := strconv.Atoi(vars["userid"])
 	if err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	var user model.User
@@ -153,7 +152,7 @@ func ViewUser(w http.ResponseWriter, r *http.Request) {
 		Joins("Instance").
 		Joins("Role").
 		First(&user).Error; err != nil {
-		helper.ResponseError(w, http.StatusNotFound, err.Error())
+		helper.ResponseMessage(w, http.StatusNotFound, err.Error())
 		return
 	}
 	helper.ResponseJSON(w, http.StatusOK, user)
@@ -163,7 +162,7 @@ func EditUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userID, err := strconv.Atoi(vars["userid"])
 	if err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	userInput := map[string]string{
@@ -175,7 +174,7 @@ func EditUser(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&userInput); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, "Gagal")
+		helper.ResponseMessage(w, http.StatusBadRequest, "Gagal")
 		return
 	}
 	defer r.Body.Close()
@@ -195,21 +194,20 @@ func EditUser(w http.ResponseWriter, r *http.Request) {
 		"reset_password_token":  "",
 		"reset_password_Expiry": 0,
 	})
-	response := map[string]string{"message": "Sukses"}
-	helper.ResponseJSON(w, http.StatusOK, response)
+	helper.ResponseMessage(w, http.StatusOK, "Sukses")
 }
 
 func EditUserOnly(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userID, err := strconv.Atoi(vars["userid"])
 	if err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	var user model.User
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&user); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, "Gagal")
+		helper.ResponseMessage(w, http.StatusBadRequest, "Gagal")
 		return
 	}
 	defer r.Body.Close()
@@ -219,20 +217,19 @@ func EditUserOnly(w http.ResponseWriter, r *http.Request) {
 		"role_id":     user.RoleID,
 		"instance_id": user.InstanceID,
 	})
-	response := map[string]string{"message": "Sukses"}
-	helper.ResponseJSON(w, http.StatusOK, response)
+	helper.ResponseMessage(w, http.StatusOK, "Sukses")
 }
 
 func ChangePassword(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userID, err := strconv.Atoi(vars["userid"])
 	if err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	userInput := map[string]string{"password": ""}
 	if err := json.NewDecoder(r.Body).Decode(&userInput); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer r.Body.Close()
@@ -244,28 +241,26 @@ func ChangePassword(w http.ResponseWriter, r *http.Request) {
 		"reset_password_token":  "",
 		"reset_password_Expiry": 0,
 	}).RowsAffected == 0 {
-		helper.ResponseError(w, http.StatusInternalServerError, "Gagal")
+		helper.ResponseMessage(w, http.StatusInternalServerError, "Gagal")
 		return
 	}
-	response := map[string]string{"message": "Sukses"}
-	helper.ResponseJSON(w, http.StatusOK, response)
+	helper.ResponseMessage(w, http.StatusOK, "Sukses")
 }
 
 func DeleteUser(w http.ResponseWriter, r *http.Request) {
 	input := map[string]int32{"id": 0}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&input); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer r.Body.Close()
 	var user model.User
 	if model.DB.Where("id = ?", input["id"]).Delete(&user).RowsAffected == 0 {
-		helper.ResponseError(w, http.StatusBadRequest, "Gagal")
+		helper.ResponseMessage(w, http.StatusBadRequest, "Gagal")
 		return
 	}
-	response := map[string]string{"message": "Sukses"}
-	helper.ResponseJSON(w, http.StatusOK, response)
+	helper.ResponseMessage(w, http.StatusOK, "Sukses")
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
@@ -277,7 +272,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&userInput); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer r.Body.Close()
@@ -294,12 +289,12 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			model.DB.Create(&model.Blockade{Ip: userInput["ip"], Count: 1})
 		} else {
 			if blockade.Count > 3 {
-				helper.ResponseError(w, http.StatusForbidden, "Silahkan jawab CAPTCHA")
+				helper.ResponseMessage(w, http.StatusForbidden, "Silahkan jawab CAPTCHA")
 				return
 			}
 			model.DB.Model(&model.Blockade{}).Where("blockades.ip = ?", userInput["ip"]).Update("count", blockade.Count+1)
 		}
-		helper.ResponseError(w, http.StatusUnauthorized, "email atau password salah")
+		helper.ResponseMessage(w, http.StatusUnauthorized, "email atau password salah")
 		return
 	}
 	// verify user pass
@@ -308,13 +303,12 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			model.DB.Create(&model.Blockade{Ip: userInput["ip"], Count: 1})
 		} else {
 			if blockade.Count > 3 {
-				helper.ResponseError(w, http.StatusForbidden, "Silahkan jawab CAPTCHA")
+				helper.ResponseMessage(w, http.StatusForbidden, "Silahkan jawab CAPTCHA")
 				return
 			}
 			model.DB.Model(&model.Blockade{}).Where("blockades.ip = ?", userInput["ip"]).Update("count", blockade.Count+1)
 		}
-		response := map[string]string{"message": "email atau password salah"}
-		helper.ResponseJSON(w, http.StatusUnauthorized, response)
+		helper.ResponseMessage(w, http.StatusUnauthorized, "email atau password salah")
 		return
 	}
 
@@ -344,36 +338,34 @@ func VerifyCaptcha(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&userInput); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer r.Body.Close()
 	var blockade model.Blockade
 	ada := model.DB.Where("blockades.ip = ? AND blockades.count > 3", userInput["ip"]).First(&blockade)
-	if ada.RowsAffected == 0 {
-		helper.ResponseJSON(w, http.StatusOK, "Silahkan login terlebih dahulu")
-		return
-	} else {
-		helper.ResponseError(w, http.StatusAlreadyReported, "Silahkan jawab CAPTCHA")
+	if ada.RowsAffected > 0 {
+		helper.ResponseMessage(w, http.StatusAlreadyReported, "Silahkan jawab CAPTCHA")
 		return
 	}
+	helper.ResponseMessage(w, http.StatusOK, "Silahkan login terlebih dahulu")
 }
 
 func RefreshJWT(w http.ResponseWriter, r *http.Request) {
 	userLoggedIn, err := ParseRefreshToken(r)
 	if err != "" {
-		helper.ResponseError(w, http.StatusUnauthorized, err)
+		helper.ResponseMessage(w, http.StatusUnauthorized, err)
 		return
 	}
 	var user model.User
 	userID, _ := strconv.Atoi(userLoggedIn.Subject)
 	if err := model.DB.First(&user, int32(userID)).Error; err != nil {
-		helper.ResponseError(w, http.StatusNotFound, err.Error())
+		helper.ResponseMessage(w, http.StatusNotFound, err.Error())
 		return
 	}
 	actualCustomKey := generateCustomKey(user)
 	if userLoggedIn.CustomKey != actualCustomKey {
-		helper.ResponseError(w, http.StatusUnauthorized, "Token anda tidak sesuai.")
+		helper.ResponseMessage(w, http.StatusUnauthorized, "Token anda tidak sesuai.")
 		return
 	}
 	accessToken := CreateAccessToken(user)
@@ -391,7 +383,7 @@ func RefreshJWT(w http.ResponseWriter, r *http.Request) {
 func Generate2FASecretHandler(w http.ResponseWriter, r *http.Request) {
 	userLoggedIn, err := ParseAccessToken(r)
 	if err != "" {
-		helper.ResponseError(w, http.StatusUnauthorized, err)
+		helper.ResponseMessage(w, http.StatusUnauthorized, err)
 		return
 	}
 	userID, _ := strconv.Atoi(userLoggedIn.Subject)
@@ -399,11 +391,11 @@ func Generate2FASecretHandler(w http.ResponseWriter, r *http.Request) {
 	if err := model.DB.Where("users.id = ?", int32(userID)).
 		Joins("Instance").
 		First(&user).Error; err != nil {
-		helper.ResponseError(w, http.StatusNotFound, err.Error())
+		helper.ResponseMessage(w, http.StatusNotFound, err.Error())
 		return
 	}
 	if user.TwoFAEnabled {
-		helper.ResponseError(w, http.StatusBadRequest, "2FA sudah diaktifkan untuk akun ini")
+		helper.ResponseMessage(w, http.StatusBadRequest, "2FA sudah diaktifkan untuk akun ini")
 		return
 	}
 
@@ -413,7 +405,7 @@ func Generate2FASecretHandler(w http.ResponseWriter, r *http.Request) {
 		AccountName: user.Email,
 	})
 	if notOk != nil {
-		helper.ResponseError(w, http.StatusInternalServerError, "Gagal menghasilkan URL QR Code")
+		helper.ResponseMessage(w, http.StatusInternalServerError, "Gagal menghasilkan URL QR Code")
 		return
 	}
 	secret := key.Secret()
@@ -430,37 +422,36 @@ func Generate2FASecretHandler(w http.ResponseWriter, r *http.Request) {
 func VerifyAndEnable2FAHandler(w http.ResponseWriter, r *http.Request) {
 	userLoggedIn, eror := ParseAccessToken(r)
 	if eror != "" {
-		helper.ResponseError(w, http.StatusUnauthorized, eror)
+		helper.ResponseMessage(w, http.StatusUnauthorized, eror)
 		return
 	}
 	userID, _ := strconv.Atoi(userLoggedIn.Subject)
 	userInput := map[string]string{"code": ""}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&userInput); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer r.Body.Close()
 
 	var user model.User
 	if err := model.DB.Where("users.ID = ?", int32(userID)).First(&user).Error; err != nil {
-		helper.ResponseError(w, http.StatusNotFound, "Pengguna tidak ditemukan")
+		helper.ResponseMessage(w, http.StatusNotFound, "Pengguna tidak ditemukan")
 		return
 	}
 	if user.TwoFASecret == "" {
-		helper.ResponseError(w, http.StatusBadRequest, "2FA belum diaktifkan.")
+		helper.ResponseMessage(w, http.StatusBadRequest, "2FA belum diaktifkan.")
 		return
 	}
 	valid := totp.Validate(userInput["code"], user.TwoFASecret)
 	if !valid {
-		helper.ResponseError(w, http.StatusUnauthorized, "Kode 2FA tidak valid.")
+		helper.ResponseMessage(w, http.StatusUnauthorized, "Kode 2FA tidak valid.")
 		return
 	}
 	model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Updates(map[string]any{
 		"two_fa_enabled": true,
 	})
-	response := map[string]string{"message": "Sukses"}
-	helper.ResponseJSON(w, http.StatusOK, response)
+	helper.ResponseMessage(w, http.StatusOK, "Sukses")
 }
 
 // Disable 2FA
@@ -468,15 +459,14 @@ func Disable2FAHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userID, err := strconv.Atoi(vars["userid"])
 	if err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	model.DB.Model(&model.User{}).Where("id = ?", int32(userID)).Updates(map[string]any{
 		"two_fa_secret":  "",
 		"two_fa_enabled": false,
 	})
-	response := map[string]string{"message": "Sukses"}
-	helper.ResponseJSON(w, http.StatusOK, response)
+	helper.ResponseMessage(w, http.StatusOK, "Sukses")
 }
 
 // Verifikasi kode 2FA untuk reset password
@@ -484,23 +474,23 @@ func Verify2FAResetPassword(w http.ResponseWriter, r *http.Request) {
 	userInput := map[string]string{"email": "", "code": ""}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&userInput); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer r.Body.Close()
 
 	var user model.User
 	if err := model.DB.Where("users.email = ?", userInput["email"]).First(&user).Error; err != nil {
-		helper.ResponseError(w, http.StatusNotFound, err.Error())
+		helper.ResponseMessage(w, http.StatusNotFound, err.Error())
 		return
 	}
 	if !user.TwoFAEnabled || user.TwoFASecret == "" {
-		helper.ResponseError(w, http.StatusBadRequest, "2FA belum diaktifkan.")
+		helper.ResponseMessage(w, http.StatusBadRequest, "2FA belum diaktifkan.")
 		return
 	}
 	valid := totp.Validate(userInput["code"], user.TwoFASecret)
 	if !valid {
-		helper.ResponseError(w, http.StatusUnauthorized, "Kode 2FA tidak valid.")
+		helper.ResponseMessage(w, http.StatusUnauthorized, "Kode 2FA tidak valid.")
 		return
 	}
 	// Jika 2FA valid, generate token khusus untuk reset password
@@ -524,7 +514,7 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&userInput); err != nil {
-		helper.ResponseError(w, http.StatusBadRequest, err.Error())
+		helper.ResponseMessage(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	defer r.Body.Close()
@@ -532,11 +522,11 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 	var user model.User
 	if err := model.DB.Where("users.email = ? AND reset_password_token = ?", userInput["email"], userInput["reset_token"]).
 		First(&user).Error; err != nil {
-		helper.ResponseError(w, http.StatusNotFound, "Invalid or expired reset token")
+		helper.ResponseMessage(w, http.StatusNotFound, "Invalid or expired reset token")
 		return
 	}
 	if time.Now().Unix() > user.ResetPasswordExpiry {
-		helper.ResponseError(w, http.StatusUnauthorized, "Reset token expired")
+		helper.ResponseMessage(w, http.StatusUnauthorized, "Reset token expired")
 		return
 	}
 	hashPassword, _ := bcrypt.GenerateFromPassword([]byte(userInput["password"]), bcrypt.DefaultCost)
@@ -548,6 +538,5 @@ func ResetPassword(w http.ResponseWriter, r *http.Request) {
 			"reset_password_token":  "",
 			"reset_password_expiry": 0,
 		})
-	response := map[string]string{"message": "Sukses"}
-	helper.ResponseJSON(w, http.StatusOK, response)
+	helper.ResponseMessage(w, http.StatusOK, "Sukses")
 }
